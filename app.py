@@ -17,8 +17,8 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-PROJECT_ROOT = Path(r"C:\Users\pusda\Documents\repos\data-analysis-ispu")
-DATA_PATH = PROJECT_ROOT / "outputs" / "ispu_jakarta_analysis.csv"
+DATA_PATH = Path("../data/ispu_jakarta_clean.csv")
+
 
 # Dashboard dapat dijalankan dari folder project maupun dari folder yang sama
 # dengan file app.py. Urutan pertama tetap mengikuti struktur project pengguna.
@@ -35,6 +35,7 @@ def resolve_data_path() -> Path:
             return candidate
     # Kembalikan path utama agar pesan error tetap informatif.
     return DATA_PATH
+
 
 # -----------------------------
 # Styling sederhana dan profesional
@@ -177,13 +178,19 @@ def load_data(path: Path) -> pd.DataFrame:
         df, ["categori", "kategori", "category", "kategori_ispu"], required=False
     )
     quality_flag_col = choose_column(
-        df, ["jumlah_flag_kualitas", "quality_flag_count", "jumlah_flag", "flag_count"], required=False
+        df,
+        ["jumlah_flag_kualitas", "quality_flag_count", "jumlah_flag", "flag_count"],
+        required=False,
     )
     validation_status_col = choose_column(
-        df, ["status_validasi_ringkas", "status_validasi", "validation_status"], required=False
+        df,
+        ["status_validasi_ringkas", "status_validasi", "validation_status"],
+        required=False,
     )
     duplicate_flag_col = choose_column(
-        df, ["flag_duplicate_key_tanggal_stasiun", "flag_duplicate", "is_duplicate"], required=False
+        df,
+        ["flag_duplicate_key_tanggal_stasiun", "flag_duplicate", "is_duplicate"],
+        required=False,
     )
     row_id_col = choose_column(
         df, ["row_id_original", "row_id", "index_original"], required=False
@@ -236,7 +243,9 @@ def load_data(path: Path) -> pd.DataFrame:
         # Sesuai arahan: kategori dashboard mengikuti kolom kategori/categori dari dataset.
         # Nilai tidak direklasifikasi berdasarkan rentang ISPU agar visualisasi konsisten
         # dengan hasil cleaning/validasi pada dataset sumber.
-        df["kategori_dashboard"] = df[category_col].map(normalize_text).fillna("TIDAK DIKETAHUI")
+        df["kategori_dashboard"] = (
+            df[category_col].map(normalize_text).fillna("TIDAK DIKETAHUI")
+        )
 
         # Hanya rapikan variasi penulisan umum tanpa mengubah kategori yang memang ada
         # di dataset, misalnya kategori tambahan seperti LUARBIASA tetap dipertahankan.
@@ -275,7 +284,9 @@ def load_data(path: Path) -> pd.DataFrame:
     else:
         flag_cols = [c for c in df.columns if c.lower().startswith("flag_")]
         if flag_cols:
-            df["jumlah_flag_kualitas_dashboard"] = df[flag_cols].astype(bool).sum(axis=1).astype(int)
+            df["jumlah_flag_kualitas_dashboard"] = (
+                df[flag_cols].astype(bool).sum(axis=1).astype(int)
+            )
         else:
             df["jumlah_flag_kualitas_dashboard"] = 0
 
@@ -303,13 +314,19 @@ def load_data(path: Path) -> pd.DataFrame:
 
     conflict_parts = []
     for conflict_col in ["ispu_dashboard", "kategori_dashboard", "critical_dashboard"]:
-        nunique = df.groupby(key_cols)[conflict_col].transform(lambda x: x.astype(str).nunique(dropna=False))
+        nunique = df.groupby(key_cols)[conflict_col].transform(
+            lambda x: x.astype(str).nunique(dropna=False)
+        )
         conflict_parts.append(nunique.gt(1))
-    df["has_duplicate_conflict_dashboard"] = np.logical_or.reduce(conflict_parts) & df["is_duplicate_key_dashboard"]
+    df["has_duplicate_conflict_dashboard"] = (
+        np.logical_or.reduce(conflict_parts) & df["is_duplicate_key_dashboard"]
+    )
 
     df["is_data_valid_dashboard"] = (
         df["jumlah_flag_kualitas_dashboard"].eq(0)
-        & df["status_validasi_dashboard"].str.upper().str.contains("TIDAK ADA FLAG", na=False)
+        & df["status_validasi_dashboard"]
+        .str.upper()
+        .str.contains("TIDAK ADA FLAG", na=False)
         & ~df["is_duplicate_key_dashboard"]
         & ~df["has_duplicate_conflict_dashboard"]
     )
@@ -459,7 +476,9 @@ def apply_quality_filters(
     else:
         out = out[out["jumlah_flag_kualitas_dashboard"].le(max_quality_flags)].copy()
         if selected_validation_statuses:
-            out = out[out["status_validasi_dashboard"].isin(selected_validation_statuses)].copy()
+            out = out[
+                out["status_validasi_dashboard"].isin(selected_validation_statuses)
+            ].copy()
 
     if duplicate_policy == "Keluarkan semua baris duplikat tanggal-stasiun":
         out = out[~out["is_duplicate_key_dashboard"]].copy()
@@ -588,11 +607,15 @@ with st.sidebar:
         help="Digunakan terutama ketika opsi data valid saja dimatikan.",
     )
 
-    validation_status_options = sorted(df["status_validasi_dashboard"].dropna().unique().tolist())
+    validation_status_options = sorted(
+        df["status_validasi_dashboard"].dropna().unique().tolist()
+    )
     selected_validation_statuses = st.multiselect(
         "Status validasi ringkas",
         options=validation_status_options,
-        default=validation_status_options if not use_valid_data_only else [s for s in validation_status_options if "Tidak ada flag" in s],
+        default=validation_status_options
+        if not use_valid_data_only
+        else [s for s in validation_status_options if "Tidak ada flag" in s],
         help="Filter ini memakai kolom status_validasi_ringkas dari dataset.",
     )
 
@@ -650,17 +673,23 @@ with st.expander("Ringkasan kualitas data pada filter aktif", expanded=True):
     valid_base_rows = int(filtered_before_quality["is_data_valid_dashboard"].sum())
     flagged_base_rows = total_base_rows - valid_base_rows
     duplicate_rows = int(filtered_before_quality["is_duplicate_key_dashboard"].sum())
-    conflict_rows = int(filtered_before_quality["has_duplicate_conflict_dashboard"].sum())
+    conflict_rows = int(
+        filtered_before_quality["has_duplicate_conflict_dashboard"].sum()
+    )
 
     q1, q2, q3, q4 = st.columns(4)
     with q1:
-        st.metric("Baris sebelum filter kualitas", f"{total_base_rows:,}".replace(",", "."))
+        st.metric(
+            "Baris sebelum filter kualitas", f"{total_base_rows:,}".replace(",", ".")
+        )
     with q2:
         st.metric("Baris masuk KPI/visualisasi", f"{len(filtered):,}".replace(",", "."))
     with q3:
         st.metric("Data valid", f"{valid_base_rows:,}".replace(",", "."))
     with q4:
-        st.metric("Baris bermasalah/perlu audit", f"{flagged_base_rows:,}".replace(",", "."))
+        st.metric(
+            "Baris bermasalah/perlu audit", f"{flagged_base_rows:,}".replace(",", ".")
+        )
 
     st.caption(
         f"Duplikasi tanggal-stasiun pada filter awal: {duplicate_rows:,} baris; "
@@ -1062,23 +1091,26 @@ with tab4:
     pm25_total_rows = len(filtered)
     pm25_available_rows = int(filtered["pm25_available_dashboard"].sum())
     pm25_missing_rows = pm25_total_rows - pm25_available_rows
-    pm25_available_pct = (pm25_available_rows / pm25_total_rows * 100) if pm25_total_rows else 0
+    pm25_available_pct = (
+        (pm25_available_rows / pm25_total_rows * 100) if pm25_total_rows else 0
+    )
 
     warning_box(
         "Catatan metodologis PM2.5",
         f"Analisis PM2.5 dibatasi pada baris/periode ketika kolom <b>pm25</b> memiliki nilai. "
         f"Pada filter aktif, PM2.5 tersedia pada <b>{pm25_available_rows:,}</b> dari <b>{pm25_total_rows:,}</b> observasi "
         f"(<b>{pm25_available_pct:.1f}%</b>). Periode PM2.5 tersedia: <b>{pm25_period_text}</b>. "
-        "Nilai PM2.5 yang missing tidak diimputasi agar dashboard tidak menciptakan data pencemar buatan.".replace(",", "."),
+        "Nilai PM2.5 yang missing tidak diimputasi agar dashboard tidak menciptakan data pencemar buatan.".replace(
+            ",", "."
+        ),
     )
 
     # Khusus komposisi dan tren pencemar dominan, baris dengan critical = PM2.5
     # hanya dipakai jika nilai pm25 tersedia. Baris pencemar lain tetap mengikuti
     # filter dashboard umum.
     param_analysis = filtered.copy()
-    invalid_pm25_critical = (
-        (param_analysis["critical_dashboard"] == "PM2.5")
-        & (~param_analysis["pm25_available_dashboard"])
+    invalid_pm25_critical = (param_analysis["critical_dashboard"] == "PM2.5") & (
+        ~param_analysis["pm25_available_dashboard"]
     )
     excluded_pm25_critical = int(invalid_pm25_critical.sum())
     param_analysis = param_analysis.loc[~invalid_pm25_critical].copy()
@@ -1136,7 +1168,9 @@ with tab4:
                     "persentase": "Persentase",
                 },
             )
-            fig_param_bar.update_traces(texttemplate="%{text:.1f}%", textposition="outside")
+            fig_param_bar.update_traces(
+                texttemplate="%{text:.1f}%", textposition="outside"
+            )
             fig_param_bar.update_layout(height=450, showlegend=False)
             st.plotly_chart(fig_param_bar, use_container_width=True)
 
@@ -1182,13 +1216,22 @@ with tab4:
                 if col == "pm25":
                     series = filtered.loc[filtered["pm25_available_dashboard"], col]
                     basis = "Hanya data PM2.5 tersedia; tidak diimputasi"
-                    catatan = "Terbatas" if filtered["pm25_available_dashboard"].mean() * 100 < min_coverage_for_direct_comparison else "Memadai"
+                    catatan = (
+                        "Terbatas"
+                        if filtered["pm25_available_dashboard"].mean() * 100
+                        < min_coverage_for_direct_comparison
+                        else "Memadai"
+                    )
                 else:
                     series = filtered[col]
                     basis = "Data tersedia pada filter aktif"
                     catatan = "Memadai"
                 n_available = int(series.notna().sum())
-                coverage_pct = (n_available / total_filtered_rows * 100) if total_filtered_rows else 0
+                coverage_pct = (
+                    (n_available / total_filtered_rows * 100)
+                    if total_filtered_rows
+                    else 0
+                )
                 rows.append(
                     {
                         "parameter_kolom": col,
@@ -1209,21 +1252,33 @@ with tab4:
             param_mean = pd.DataFrame(rows).dropna(subset=["rata_rata_nilai"])
             if not param_mean.empty:
                 pm25_row = param_mean[param_mean["parameter"] == "PM2.5"]
-                if not pm25_row.empty and float(pm25_row.iloc[0]["coverage_pct"]) < min_coverage_for_direct_comparison:
+                if (
+                    not pm25_row.empty
+                    and float(pm25_row.iloc[0]["coverage_pct"])
+                    < min_coverage_for_direct_comparison
+                ):
                     warning_box(
                         "Catatan penting interpretasi PM2.5",
                         f"PM2.5 memiliki rata-rata <b>{pm25_row.iloc[0]['rata_rata_nilai']:.1f}</b>, tetapi hanya tersedia pada "
                         f"<b>{int(pm25_row.iloc[0]['jumlah_data_tersedia']):,}</b> dari <b>{total_filtered_rows:,}</b> observasi "
                         f"(<b>{pm25_row.iloc[0]['coverage_pct']:.1f}%</b>). Karena cakupannya rendah, PM2.5 tidak boleh dibaca sebagai "
-                        "peringkat polutan tertinggi yang sepenuhnya sebanding dengan parameter lain."
+                        "peringkat polutan tertinggi yang sepenuhnya sebanding dengan parameter lain.",
                     )
 
                 param_mean["label_bar"] = param_mean.apply(
-                    lambda r: f"{r['rata_rata_nilai']:.1f}<br>n={int(r['jumlah_data_tersedia']):,}<br>{r['coverage_pct']:.1f}%".replace(",", "."),
+                    lambda r: (
+                        f"{r['rata_rata_nilai']:.1f}<br>n={int(r['jumlah_data_tersedia']):,}<br>{r['coverage_pct']:.1f}%".replace(
+                            ",", "."
+                        )
+                    ),
                     axis=1,
                 )
                 param_mean["parameter_label"] = param_mean.apply(
-                    lambda r: f"{r['parameter']} ({r['catatan']})" if r["status_kelengkapan"].startswith("Cakupan rendah") else r["parameter"],
+                    lambda r: (
+                        f"{r['parameter']} ({r['catatan']})"
+                        if r["status_kelengkapan"].startswith("Cakupan rendah")
+                        else r["parameter"]
+                    ),
                     axis=1,
                 )
 
@@ -1234,7 +1289,9 @@ with tab4:
                 )
                 chart_data = param_mean.copy()
                 if not show_low_coverage:
-                    chart_data = chart_data[chart_data["coverage_pct"] >= min_coverage_for_direct_comparison]
+                    chart_data = chart_data[
+                        chart_data["coverage_pct"] >= min_coverage_for_direct_comparison
+                    ]
 
                 fig_param_value = px.bar(
                     chart_data.sort_values("rata_rata_nilai", ascending=False),
@@ -1257,7 +1314,9 @@ with tab4:
                     },
                 )
                 fig_param_value.update_traces(textposition="outside")
-                fig_param_value.update_layout(height=500, legend_title_text="Status kelengkapan")
+                fig_param_value.update_layout(
+                    height=500, legend_title_text="Status kelengkapan"
+                )
                 st.plotly_chart(fig_param_value, use_container_width=True)
 
                 fig_coverage = px.bar(
@@ -1280,18 +1339,24 @@ with tab4:
                     annotation_text="Ambang pembanding langsung 80%",
                     annotation_position="top left",
                 )
-                fig_coverage.update_traces(texttemplate="%{text:.1f}%", textposition="outside")
-                fig_coverage.update_layout(height=420, legend_title_text="Status kelengkapan")
+                fig_coverage.update_traces(
+                    texttemplate="%{text:.1f}%", textposition="outside"
+                )
+                fig_coverage.update_layout(
+                    height=420, legend_title_text="Status kelengkapan"
+                )
                 st.plotly_chart(fig_coverage, use_container_width=True)
 
-                param_table = param_mean[[
-                    "parameter",
-                    "rata_rata_nilai",
-                    "jumlah_data_tersedia",
-                    "coverage_pct",
-                    "status_kelengkapan",
-                    "basis_analisis",
-                ]].copy()
+                param_table = param_mean[
+                    [
+                        "parameter",
+                        "rata_rata_nilai",
+                        "jumlah_data_tersedia",
+                        "coverage_pct",
+                        "status_kelengkapan",
+                        "basis_analisis",
+                    ]
+                ].copy()
                 param_table = param_table.rename(
                     columns={
                         "parameter": "Parameter",
@@ -1302,7 +1367,9 @@ with tab4:
                         "basis_analisis": "Basis Analisis",
                     }
                 )
-                param_table[["Rata-rata Nilai", "Coverage (%)"]] = param_table[["Rata-rata Nilai", "Coverage (%)"]].round(1)
+                param_table[["Rata-rata Nilai", "Coverage (%)"]] = param_table[
+                    ["Rata-rata Nilai", "Coverage (%)"]
+                ].round(1)
                 st.dataframe(param_table, use_container_width=True, hide_index=True)
 
                 st.caption(
