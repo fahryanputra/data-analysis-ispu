@@ -17,7 +17,7 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-DATA_PATH = Path("../data/ispu_jakarta_clean.csv")
+DATA_PATH = Path("./data/ispu_jakarta_clean.csv")
 
 
 # Dashboard dapat dijalankan dari folder project maupun dari folder yang sama
