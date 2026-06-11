@@ -599,13 +599,26 @@ with st.sidebar:
     )
 
     max_flag_available = int(df["jumlah_flag_kualitas_dashboard"].max())
-    max_quality_flags = st.slider(
-        "Maksimum jumlah_flag_kualitas yang boleh masuk analisis",
-        min_value=0,
-        max_value=max_flag_available,
-        value=0 if use_valid_data_only else max_flag_available,
-        help="Digunakan terutama ketika opsi data valid saja dimatikan.",
-    )
+    max_flag_available = int(df["jumlah_flag_kualitas_dashboard"].max())
+
+    if max_flag_available > 0:
+        max_quality_flags = st.slider(
+            "Maksimum jumlah_flag_kualitas yang boleh masuk analisis",
+            min_value=0,
+            max_value=max_flag_available,
+            value=max_flag_available,
+            step=1,
+            help=(
+                "Semakin kecil nilainya, semakin ketat data yang masuk ke KPI dan grafik utama. "
+                "Nilai 0 berarti hanya data tanpa flag kualitas yang digunakan."
+            ),
+        )
+    else:
+        max_quality_flags = 0
+        st.info(
+            "Seluruh data pada dataset memiliki jumlah_flag_kualitas = 0. "
+            "Filter maksimum flag kualitas tidak ditampilkan karena tidak ada variasi nilai flag."
+        )
 
     validation_status_options = sorted(
         df["status_validasi_dashboard"].dropna().unique().tolist()
